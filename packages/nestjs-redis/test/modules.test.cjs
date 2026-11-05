@@ -1,30 +1,25 @@
 require('reflect-metadata');
-
 const assert = require('node:assert/strict');
-
 const { test } = require('node:test');
-
 const { Module } = require('@nestjs/common');
-
 const { NestFactory } = require('@nestjs/core');
-
 const sdk = require('@redis/client');
-
 const { RedisCacheModule, RedisCacheService } = require('../dist/index.js');
-
+const { RedisAtomicModule, RedisAtomicService } = require('../dist/atomic.js');
 const options = {
   host: 'localhost',
   namespace: 'unit',
   connectTimeoutMs: 20,
   commandTimeoutMs: 20,
 };
-
 const start = (module) =>
   NestFactory.createApplicationContext(module, {
     logger: false,
     abortOnError: false,
   });
 
+// Only transport is replaced: actual SDK clients, adapters, Keyv, cache-manager,
+// built package exports and Nest providers are used. No Redis server is contacted.
 function transport(context, behavior = async () => {}) {
   const original = sdk.createClient;
   const clients = [];
@@ -40,6 +35,12 @@ function transport(context, behavior = async () => {}) {
     return client;
   });
   return clients;
+}
+
+function root(imports) {
+  class Root {}
+  Module({ imports })(Root);
+  return Root;
 }
 
 test('cache-only async factory/injection initializes exactly one client and shutdown closes it', async (context) => {
@@ -74,6 +75,111 @@ test('cache-only async factory/injection initializes exactly one client and shut
   }
   assert.equal(clients[0].destroy.mock.callCount(), 1);
   await assert.rejects(app.get(RedisCacheService).get('after-close'));
+});
+
+test('cache plus atomic share startup transaction, own two clients and clean both on startup failure', async (context) => {
+  const clients = transport(context, async (index) => {
+    if (index === 1) throw new Error('redis://secret/payload');
+  });
+  let app;
+  try {
+    await assert.rejects(
+      async () => {
+        app = await start(
+          root([
+            RedisCacheModule.forRoot(options),
+            RedisAtomicModule.forRoot(options),
+          ]),
+        );
+      },
+      { message: 'Redis operation failed' },
+    );
+    const selected = clients.filter(
+      ({ connect }) => connect.mock.callCount() > 0,
+    );
+    assert.equal(selected.length, 2);
+    assert.equal(clients[0].connect.mock.callCount(), 1);
+    assert.equal(selected[1].connect.mock.callCount(), 1);
+    assert.deepEqual(
+      clients
+        .filter(({ connect }) => connect.mock.callCount() > 0)
+        .map(({ destroy }) => destroy.mock.callCount()),
+      [1, 1],
+    );
+  } finally {
+    if (app) await app.close();
+  }
+});
+
+test('successful cache plus atomic initialization has two clients and closes both', async (context) => {
+  const clients = transport(context);
+  const app = await start(
+    root([
+      RedisCacheModule.forRoot(options),
+      RedisAtomicModule.forRoot(options),
+    ]),
+  );
+  try {
+    assert(app.get(RedisAtomicService) instanceof RedisAtomicService);
+    const selected = clients.filter(
+      ({ connect }) => connect.mock.callCount() > 0,
+    );
+    assert.equal(selected.length, 2);
+    assert.deepEqual(
+      clients
+        .filter(({ connect }) => connect.mock.callCount() > 0)
+        .map(({ connect }) => connect.mock.callCount()),
+      [1, 1],
+    );
+  } finally {
+    await app.close();
+  }
+  assert.deepEqual(
+    clients
+      .filter(({ connect }) => connect.mock.callCount() > 0)
+      .map(({ destroy }) => destroy.mock.callCount()),
+    [1, 1],
+  );
+});
+
+test('startup deadline destroys the client even when connect never settles', async (context) => {
+  const clients = transport(context, () => new Promise(() => {}));
+  let app;
+  try {
+    await assert.rejects(
+      async () => {
+        app = await start(RedisAtomicModule.forRoot(options));
+      },
+      { message: 'Redis operation failed' },
+    );
+    assert.equal(clients[0].destroy.mock.callCount(), 1);
+  } finally {
+    if (app) await app.close();
+  }
+});
+
+test('node-redis receives intact URL, disabled native retries and verified TLS', async (context) => {
+  const clients = transport(context);
+  const url = 'rediss://user:p%40ss@localhost:6379/2';
+  const app = await start(
+    RedisAtomicModule.forRoot({
+      namespace: 'unit',
+      url,
+      tls: { servername: 'localhost' },
+      reconnect: { attempts: 2, delayMs: 10 },
+    }),
+  );
+  try {
+    const config = clients[0].config;
+    assert(config, 'SDK configuration must be supplied');
+    assert.equal(config.url, url);
+    assert.equal(config.disableOfflineQueue, true);
+    assert.equal(config.socket.rejectUnauthorized, true);
+    assert.equal(config.socket.tls, true);
+    assert.equal(config.socket.reconnectStrategy, false);
+  } finally {
+    await app.close();
+  }
 });
 
 for (const operation of ['get', 'set', 'del', 'clear', 'wrap']) {
@@ -162,4 +268,49 @@ test('adapter cannot reopen an owned socket after a late scan completes past the
   } finally {
     await app.close();
   }
+});
+
+test('configuration factory failure happens before any Redis socket is opened', async (context) => {
+  const clients = transport(context);
+  await assert.rejects(
+    start(
+      root([
+        RedisCacheModule.forRoot(options),
+        RedisAtomicModule.forRootAsync({
+          useFactory: async () => {
+            throw new Error('Application configuration failed');
+          },
+        }),
+      ]),
+    ),
+    { message: 'Application configuration failed' },
+  );
+  assert.equal(
+    clients.reduce((sum, { connect }) => sum + connect.mock.callCount(), 0),
+    0,
+  );
+});
+
+test('startup rollback stays within its Nest context', async (context) => {
+  const clients = transport(context, async (ordinal) => {
+    if (ordinal === 2) throw new Error('transport failure');
+  });
+  const first = await start(RedisCacheModule.forRoot(options));
+  const firstConnection = clients.find(
+    ({ connect }) => connect.mock.callCount() > 0,
+  );
+  try {
+    await assert.rejects(
+      start(
+        root([
+          RedisCacheModule.forRoot(options),
+          RedisAtomicModule.forRoot(options),
+        ]),
+      ),
+    );
+    assert.equal(firstConnection.destroy.mock.callCount(), 0);
+  } finally {
+    await first.close();
+  }
+  assert.equal(firstConnection.destroy.mock.callCount(), 1);
 });
