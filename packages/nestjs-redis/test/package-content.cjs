@@ -16,8 +16,11 @@ for (const name of readdirSync(resolve(root, 'dist'))) {
       `Nonportable declaration: ${name}`,
     );
 }
-assert.equal(
-  typeof require('../dist/index.js').RedisOperationError,
-  'function',
+const cache = require('../dist/index.js');
+const atomic = require('../dist/atomic.js');
+assert.equal(typeof cache.RedisCacheModule.forRootAsync, 'function');
+assert.equal(typeof atomic.RedisAtomicModule.forRootAsync, 'function');
+assert.equal(cache.RedisOperationError, atomic.RedisOperationError);
+console.log(
+  'PASS: named CJS exports, shared error identity and portable declaration artifacts',
 );
-console.log('PASS: declared exports and portable declaration artifacts');

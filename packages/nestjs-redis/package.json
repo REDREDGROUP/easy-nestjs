@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./atomic": {
+      "types": "./dist/atomic.d.ts",
+      "require": "./dist/atomic.js",
+      "default": "./dist/atomic.js"
     }
   },
   "files": [
@@ -23,9 +28,10 @@
     "build:production": "tsc --project tsconfig.json",
     "test:unit": "node --test test/options.test.cjs test/guard.test.cjs",
     "prepack": "node test/package-content.cjs",
-    "test:modules": "node --test test/cache.test.cjs test/modules.test.cjs",
+    "test:modules": "node --test test/cache.test.cjs test/modules.test.cjs test/atomic.test.cjs",
     "test:auth": "node test/auth.cjs",
-    "test:tls": "node test/tls.cjs"
+    "test:tls": "node test/tls.cjs",
+    "test:integration": "node test/integration.cjs"
   },
   "dependencies": {
     "@redis/client": "5.12.1",
