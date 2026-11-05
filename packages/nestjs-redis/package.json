@@ -1,0 +1,60 @@
+{
+  "name": "@redredgroup/nestjs-redis",
+  "version": "0.0.0",
+  "description": "Redis cache and optional atomic operations for NestJS",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./atomic": {
+      "types": "./dist/atomic.d.ts",
+      "require": "./dist/atomic.js",
+      "default": "./dist/atomic.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "VERIFICATION.md"
+  ],
+  "scripts": {
+    "test": "pnpm build:production && pnpm test:unit && pnpm test:modules",
+    "test:modules": "node --test test/cache.test.cjs test/modules.test.cjs test/atomic.test.cjs",
+    "test:integration": "node test/integration.cjs",
+    "test:tls": "node test/tls.cjs",
+    "test:consumer": "node test/consumer.cjs",
+    "lint": "pnpm exec biome check .",
+    "type-check": "tsc --noEmit",
+    "build:production": "tsc --project tsconfig.json",
+    "test:unit": "node --test test/options.test.cjs test/guard.test.cjs",
+    "prepack": "node test/package-content.cjs",
+    "test:auth": "node test/auth.cjs"
+  },
+  "dependencies": {
+    "@redis/client": "5.12.1",
+    "@keyv/redis": "5.0.0",
+    "cache-manager": "7.2.0",
+    "keyv": "5.5.0"
+  },
+  "devDependencies": {
+    "@nestjs/common": "11.1.21",
+    "@nestjs/core": "11.1.21",
+    "reflect-metadata": "0.1.13",
+    "rxjs": "7.8.2"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.1.21",
+    "@nestjs/core": "^11.1.21"
+  },
+  "engines": {
+    "node": "24.13.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
