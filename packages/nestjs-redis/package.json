@@ -23,7 +23,9 @@
     "build:production": "tsc --project tsconfig.json",
     "test:unit": "node --test test/options.test.cjs test/guard.test.cjs",
     "prepack": "node test/package-content.cjs",
-    "test:modules": "node --test test/cache.test.cjs"
+    "test:modules": "node --test test/cache.test.cjs test/modules.test.cjs",
+    "test:auth": "node test/auth.cjs",
+    "test:tls": "node test/tls.cjs"
   },
   "dependencies": {
     "@redis/client": "5.12.1",
