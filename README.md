@@ -9,6 +9,7 @@ NestJS integrations maintained in a pnpm workspace.
 - `@redredgroup/nestjs-mixpanel`: Mixpanel integration
 - `@redredgroup/nestjs-openai`: OpenAI integration
 - `@redredgroup/nestjs-solapi`: SOLAPI integration
+- `@redredgroup/nestjs-redis`: Redis cache and optional atomic operations (unpublished; see the package's [usage and tests](packages/nestjs-redis/README.md))
 
 ## Requirements
 

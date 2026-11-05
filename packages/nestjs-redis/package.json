@@ -31,7 +31,8 @@
     "test:modules": "node --test test/cache.test.cjs test/modules.test.cjs test/atomic.test.cjs",
     "test:auth": "node test/auth.cjs",
     "test:tls": "node test/tls.cjs",
-    "test:integration": "node test/integration.cjs"
+    "test:integration": "node test/integration.cjs",
+    "test:consumer": "node test/consumer.cjs"
   },
   "dependencies": {
     "@redis/client": "5.12.1",
@@ -54,6 +55,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "private": true
+  }
 }
