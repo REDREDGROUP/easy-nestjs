@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2022",
+    "strict": true,
+    "declaration": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "types": ["node"],
+    "ignoreDeprecations": "6.0",
+    "outDir": "dist",
+    "rootDir": "libs",
+    "noEmitOnError": true
+  },
+  "include": ["libs"],
+  "exclude": ["node_modules", "dist", "test"]
+}
